@@ -1,0 +1,58 @@
+#### Creating a virtual environment
+
+On root:
+
+python -m venv fastapienv 
+
+This will create a new directory called fastapienv in your current directory.
+
+To activate the virtual environment, type .\fastapienv\Scripts\activate and press Enter.
+
+(just type 'deactivate' to deactivate it)
+
+Now you are in your virtual enviroment. If you type 'pip list' it will show only two or three 
+packages as installed.
+
+#### Installing FastAPI
+
+Once you have activated your virtual environment, you can install FastAPI using pip. 
+
+pip install fastapi
+
+This will install FastAPI along with all its dependencies.
+
+Then install uvicorn (web server for fastAPI)
+
+pip install "uvicorn[standard]"
+
+now if we type 'pip list' it will show more packages
+
+#### Creating a basic FastAPI application 
+
+Create a new file called main.py in your project directory.
+
+Open main.py in your favorite text editor and add the following code:
+
+´´´py
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
+´´´
+
+#### Running the application
+
+Finally, you can run your FastAPI application using uvicorn. Here are the steps to run your application:
+
+Open the command prompt and navigate to your project directory.
+
+uvicorn main:app --reload 
+
+This will start the development server.
+
+Open your web browser and go to http://localhost:8000/. You should see a message saying “Hello World”.
+
+That’s it! You have successfully set up a basic FastAPI application on Windows.
