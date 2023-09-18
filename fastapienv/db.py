@@ -12,7 +12,7 @@ mongodb_uri = os.getenv("MONGODB_URI")
 client = MongoClient(mongodb_uri)
 db = client["proctoring"]
 
-VALID_COLLECTIONS = ["blur", "conversations", "firstPhoto", "screenshot"]
+VALID_COLLECTIONS = ["blur", "conversations", "firstPhoto", "screenshot","test"]
 
 def get_mongo_collection(collection_name: str, student_email: str = None):
     # Ensure the collection name is valid
