@@ -15,7 +15,7 @@ def get_screenshot_report(student_email: str, student_report: dict):
     logger.log('Fetching screenshot from the database...')
     screenshots = db.get_mongo_collection("screenshot", student_email)
     if not screenshots:
-        student_report["screenshot"] = "No screenshots found for the given student email."
+        student_report["screenshot"] = "FAIL: No screenshot."
         return
     # Only keep the latest screenshot
     screenshot_data = screenshots[-1]
@@ -35,4 +35,4 @@ def get_screenshot_report(student_email: str, student_report: dict):
     else:
         result = answer == "formulario de prueba"
     logger.log('Appending to the report...')
-    student_report["screenshot"] = "success" if result else "fail"
+    student_report["screenshot"] = "SUCCESS" if result else "FAIL: Wrong text."
