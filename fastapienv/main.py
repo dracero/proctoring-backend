@@ -7,6 +7,7 @@ from fastapi.encoders import jsonable_encoder
 import json
 # import machine learning models
 from transformers import pipeline
+from transformers import AutoImageProcessor, AutoModelForObjectDetection
 from PIL import Image
 from io import BytesIO
 import base64
@@ -26,10 +27,9 @@ logger = Logger(name="main_module")
 async def load_models():
     logger.log("Initializing machine learning models...", logging.INFO)
     try:
-        ML.Models.nlp = pipeline(
-            "document-question-answering",
-            model="impira/layoutlm-document-qa",
-        )
+        ML.Models.nlp = pipeline("document-question-answering", model="impira/layoutlm-document-qa",)
+        ML.Models.image_processor = AutoImageProcessor.from_pretrained("hustvl/yolos-tiny")
+        ML.Models.object_detection_model = AutoModelForObjectDetection.from_pretrained("hustvl/yolos-tiny")
         logger.log("Machine learning models initialized successfully.", logging.INFO)
     except Exception as e:
         ErrorHandler.handle_exception(e)
@@ -45,7 +45,7 @@ async def get_reports_for_test(test_name: str):
     student_reports = []    
     for student_email in students_list:
         # Generate the report for the student
-        report = get_student_report(student_email)
+        report = get_student_report(student_email,test_name)
         # Append the report to the list of reports
         student_reports.append(report)    
     logger.log(f"Reports generated successfully for test: {test_name}", logging.INFO)
@@ -65,14 +65,18 @@ def retrieve_students(exam_name: str):
         return []
 
 
-def get_student_report(student_email: str):
+def get_student_report(student_email: str,student_test : str):
     logger.log(f"Generating report for student: {student_email}", logging.INFO)
     # Initialize an empty dictionary that will hold the report for the student
     student_report = dict()
     student_report["student"] = student_email
+    student_report["test"] = student_test 
     try:
         # Process student screenshot and append results to the report
-        ML.get_screenshot_report(student_email, student_report)
+        ML.get_screenshot_report(student_email,student_test,student_report)
+        ML.get_OOF_report(student_email,student_report) 
+        ML.get_blur_report(student_email,student_report) 
+        ML.get_OD_report(student_email,student_report)
         # ... other report functions will go here ...
     except ErrorHandler.Error as e:
         ErrorHandler.handle_exception(e)
@@ -87,7 +91,12 @@ def get_student_report(student_email: str):
     #   ¿Cómo manejamos los distintos checkeos para cada exámen?
     #   IDEA 1: Crear una 'screenshot_checklist' según el nombre de el exámen
     #   IDEA 2: Si solo verificamos el título de el exámen, entonces podemos simplemente
-    #   pasarlo como argumento y comparar con él
+    #   pasarlo como argumento y comparar con él (ESTA)
+    ################################
+    #   ¿Cómo manejamos los distintos tipos de fallos?
+    #   IDEA 1: Puedo dejarlo como esta y que el front se ocupe de el manejo.
     ################################
     #   ¿Qué módulo de ML implemento para la semana que viene?
     #   EXPLICACIÓN: 
+    #   Pasar los Screenshots Periodicos por el detector de objetos
+
