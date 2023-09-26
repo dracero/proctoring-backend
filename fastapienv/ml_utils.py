@@ -40,43 +40,44 @@ def get_screenshot_report(student_email: str, student_test: str,student_report: 
     logger.log('Appending to the report...')
     student_report["screenshot"] = "SUCCESS" if result else "FAIL: Wrong text."
 
-def get_OOF_report(student_email: str, student_report: dict):
-    logger.log(f"Checking out of frame data for student: {student_email}")
+def get_OOF_report(student_email: str, student_test: str, student_report: dict):
+    logger.log(f"Checking out of frame data for student: {student_email} for test: {student_test}")
     try:
-        # Query the outOfFrame collection for documents with the student's email
+        # Query the outOfFrame collection for documents with the student's email and test
         out_of_frame_data = db.get_mongo_collection("outOfFrame", student_email)
-        # If any documents are found, append a new field to the student_report
+        out_of_frame_data = [data for data in out_of_frame_data if data.get('exam') == student_test]
         if out_of_frame_data:
             student_report["outOfFrame"] = "FAIL"
-            logger.log(f"Student {student_email} has failed the out of frame test.")
+            logger.log(f"Student {student_email} has failed the out of frame test for {student_test}.")
         else:
             student_report["outOfFrame"] = "SUCCESS"
-            logger.log(f"Student {student_email} has passed the out of frame test.")
+            logger.log(f"Student {student_email} has passed the out of frame test for {student_test}.")
     except ErrorHandler.Error as e:
         ErrorHandler.handle_exception(e)
         logger.log(str(e), logging.ERROR)
 
-def get_blur_report(student_email: str, student_report: dict):
-    logger.log(f"Checking blur data for the student: {student_email}")
+def get_blur_report(student_email: str, student_test: str, student_report: dict):
+    logger.log(f"Checking blur data for the student: {student_email} for test: {student_test}")
     try:
-        # Query the outOfFrame collection for documents with the student's email
-        out_of_frame_data = db.get_mongo_collection("blur", student_email)
-        # If any documents are found, append a new field to the student_report
-        if out_of_frame_data:
+        # Query the blur collection for documents with the student's email and test
+        blur_data = db.get_mongo_collection("blur", student_email)
+        blur_data = [data for data in blur_data if data.get('exam') == student_test]
+        if blur_data:
             student_report["blur"] = "FAIL"
-            logger.log(f"Student {student_email} has failed the blur test.")
+            logger.log(f"Student {student_email} has failed the blur test for {student_test}.")
         else:
             student_report["blur"] = "SUCCESS"
-            logger.log(f"Student {student_email} has passed the blur test.")
+            logger.log(f"Student {student_email} has passed the blur test for {student_test}.")
     except ErrorHandler.Error as e:
         ErrorHandler.handle_exception(e)
-        logger.log(str(e), logging.ERROR)        
+        logger.log(str(e), logging.ERROR)
 
-def get_OD_report(student_email: str, student_report: dict):
-    logger.log(f"Running object detection for student: {student_email}")
+def get_OD_report(student_email: str, student_test: str, student_report: dict):
+    logger.log(f"Running object detection for student: {student_email} for test: {student_test}")
     try:
-        # Query the "periodicPhotos" collection and retrieve all images
+        # Query the "periodicPhotos" collection and retrieve all images for the student's email and test
         periodic_photos_data = db.get_mongo_collection("periodicPhotos", student_email)
+        periodic_photos_data = [data for data in periodic_photos_data if data.get('exam') == student_test]
         
         if not periodic_photos_data:
             student_report["objectDetection"] = "FAIL: No periodic photos found."
@@ -86,14 +87,14 @@ def get_OD_report(student_email: str, student_report: dict):
             # Convert base64 to Image
             base64_image = photo_data["image"]
             image_data = base64.b64decode(base64_image.split(',')[1])
-            image = Image.open(BytesIO(image_data))    
-            image = image.convert('RGB')        
+            image = Image.open(BytesIO(image_data))
+            image = image.convert('RGB')
             # Run the images through the Object Detection model
             inputs = Models.image_processor(images=image, return_tensors="pt")
-            outputs = Models.object_detection_model(**inputs)        
+            outputs = Models.object_detection_model(**inputs)
             # Convert outputs to COCO API
             target_sizes = torch.tensor([image.size[::-1]])
-            results = Models.image_processor.post_process_object_detection(outputs, threshold=0.5, target_sizes=target_sizes)[0]            
+            results = Models.image_processor.post_process_object_detection(outputs, threshold=0.5, target_sizes=target_sizes)[0]
             # Determine whether the function should return "SUCCESS" or "FAIL"
             person_detected = False
             cell_phone_detected = False
@@ -108,15 +109,12 @@ def get_OD_report(student_email: str, student_report: dict):
                     cell_phone_confidence = score.item()
             
             if not person_detected or (cell_phone_detected and cell_phone_confidence > 0.9):
-                student_report["objectDetection"] = "FAIL: Unauthorized object detected or person not detected."
+                student_report["objectDetection"] = "FAIL"
                 return
         
         student_report["objectDetection"] = "SUCCESS"
-        logger.log(f"Student {student_email} has passed the object detection test.")
-        
-        student_report["objectDetection"] = "SUCCESS"
-        logger.log(f"Object detection completed successfully for student: {student_email}")
-        
+        logger.log(f"Student {student_email} has passed the object detection test for {student_test}.")
+                
     except ErrorHandler.Error as e:
         ErrorHandler.handle_exception(e)
-        logger.log(str(e))
+        logger.log(str(e), logging.ERROR)

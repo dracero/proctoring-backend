@@ -74,9 +74,9 @@ def get_student_report(student_email: str,student_test : str):
     try:
         # Process student screenshot and append results to the report
         ML.get_screenshot_report(student_email,student_test,student_report)
-        ML.get_OOF_report(student_email,student_report) 
-        ML.get_blur_report(student_email,student_report) 
-        ML.get_OD_report(student_email,student_report)
+        ML.get_OOF_report(student_email,student_test,student_report) 
+        ML.get_blur_report(student_email,student_test,student_report) 
+        ML.get_OD_report(student_email,student_test,student_report)
         # ... other report functions will go here ...
     except ErrorHandler.Error as e:
         ErrorHandler.handle_exception(e)
