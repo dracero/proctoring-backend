@@ -9,26 +9,26 @@ from project_utils import Logger, ErrorHandler  # Import the Logger and ErrorHan
 # Initialize the logger for this module
 logger = Logger(__name__)
 
+# Wrapper for ML models. The attributes are initialized at startup. 
 class Models:
     nlp = None
     image_processor = None
     object_detection_model = None
+    speech_classifier = None
 
 def get_screenshot_report(student_email: str, student_test: str,student_report: dict):
-    logger.log('Fetching screenshot from the database...')
-    screenshots = db.get_mongo_collection("screenshot", student_email)
+    logger.log(f"Generating screenshot report for student: {student_email} for the test: {student_test}")
+    screenshots = db.get_mongo_collection("screenshot", {"student": student_email, "exam": student_test})
     if not screenshots:
         student_report["screenshot"] = "FAIL: No screenshot."
         return
     # Only keep the latest screenshot
     screenshot_data = screenshots[-1]
     base64_image = screenshot_data["image"]
-    logger.log('Processing image data...')
     # Convert base64 to JPG
     image_data = base64.b64decode(base64_image.split(',')[1])
     image = Image.open(BytesIO(image_data))
     image = image.convert('RGB')
-    logger.log('Running image through the pipeline...')
     # Use the document-question-answering pipeline
     title_data = Models.nlp(image, "What does the title say?")[0]
     score = title_data.get('score', 0)
@@ -37,15 +37,13 @@ def get_screenshot_report(student_email: str, student_test: str,student_report: 
         result = False
     else:
         result = answer == student_test.lower()
-    logger.log('Appending to the report...')
     student_report["screenshot"] = "SUCCESS" if result else "FAIL: Wrong text."
 
 def get_OOF_report(student_email: str, student_test: str, student_report: dict):
-    logger.log(f"Checking out of frame data for student: {student_email} for test: {student_test}")
+    logger.log(f"Generating out of frame report for student: {student_email} for the test: {student_test}")
     try:
         # Query the outOfFrame collection for documents with the student's email and test
-        out_of_frame_data = db.get_mongo_collection("outOfFrame", student_email)
-        out_of_frame_data = [data for data in out_of_frame_data if data.get('exam') == student_test]
+        out_of_frame_data = db.get_mongo_collection("outOfFrame", {"student": student_email, "exam": student_test})
         if out_of_frame_data:
             student_report["outOfFrame"] = "FAIL"
             logger.log(f"Student {student_email} has failed the out of frame test for {student_test}.")
@@ -57,17 +55,14 @@ def get_OOF_report(student_email: str, student_test: str, student_report: dict):
         logger.log(str(e), logging.ERROR)
 
 def get_blur_report(student_email: str, student_test: str, student_report: dict):
-    logger.log(f"Checking blur data for the student: {student_email} for test: {student_test}")
+    logger.log(f"Generating blur report for student: {student_email} for the test: {student_test}")
     try:
         # Query the blur collection for documents with the student's email and test
-        blur_data = db.get_mongo_collection("blur", student_email)
-        blur_data = [data for data in blur_data if data.get('exam') == student_test]
+        blur_data = db.get_mongo_collection("blur", {"student": student_email, "exam": student_test})
         if blur_data:
             student_report["blur"] = "FAIL"
-            logger.log(f"Student {student_email} has failed the blur test for {student_test}.")
         else:
             student_report["blur"] = "SUCCESS"
-            logger.log(f"Student {student_email} has passed the blur test for {student_test}.")
     except ErrorHandler.Error as e:
         ErrorHandler.handle_exception(e)
         logger.log(str(e), logging.ERROR)
@@ -76,9 +71,7 @@ def get_OD_report(student_email: str, student_test: str, student_report: dict):
     logger.log(f"Running object detection for student: {student_email} for test: {student_test}")
     try:
         # Query the "periodicPhotos" collection and retrieve all images for the student's email and test
-        periodic_photos_data = db.get_mongo_collection("periodicPhotos", student_email)
-        periodic_photos_data = [data for data in periodic_photos_data if data.get('exam') == student_test]
-        
+        periodic_photos_data = db.get_mongo_collection("periodicPhotos", {"student": student_email, "exam": student_test})
         if not periodic_photos_data:
             student_report["objectDetection"] = "FAIL: No periodic photos found."
             return
@@ -113,8 +106,47 @@ def get_OD_report(student_email: str, student_test: str, student_report: dict):
                 return
         
         student_report["objectDetection"] = "SUCCESS"
-        logger.log(f"Student {student_email} has passed the object detection test for {student_test}.")
                 
     except ErrorHandler.Error as e:
         ErrorHandler.handle_exception(e)
         logger.log(str(e), logging.ERROR)
+
+def get_speech_report(student_email: str, student_test: str, student_report: dict):
+    logger.log(f"Running speech recognition for student: {student_email} for test: {student_test}")
+    try:
+        # Initialize the zero-shot-classification pipeline with the specified model
+        classifier = Models.speech_classifier        
+        # Query the 'conversations' collection for the specified student and test
+        conversations_data = db.get_mongo_collection("conversations", {"student": student_email, "exam": student_test})     
+        # If no conversations are found, we can append SUCCESS and return early
+        if not conversations_data:
+            student_report["speech"] = "SUCCESS: No conversations found."
+            return        
+        # Query the 'test' collection to get the themes for the specified student and test
+        test_data = db.get_mongo_collection("test", {"student": student_email, "exam": student_test})
+        # Extract the themes and split them into a list of labels
+        themes = test_data[0].get("themes", "").split(',') if test_data else []
+        # Initialize a variable to hold the merged transcript
+        merged_transcript = ""        
+        # Process each conversation snippet individually
+        for conversation in conversations_data:
+            snippet = conversation.get("conversation", "")
+            merged_transcript += snippet + " "  # Append the snippet to the merged transcript            
+            # Classify the snippet and check the probabilities
+            result = classifier(snippet, themes)
+            for label, score in zip(result["labels"], result["scores"]):
+                if score > 0.5:
+                    student_report["speech"] = f"FAIL: Detected theme '{label}' in conversation snippet with probability {score}."
+                    return  # Return early as we have detected a theme        
+        # Process the merged transcript
+        result = classifier(merged_transcript, themes)
+        for label, score in zip(result["labels"], result["scores"]):
+            if score > 0.5:
+                student_report["speech"] = f"FAIL: Detected theme '{label}' in merged transcript with probability {score}."
+                return  # Return early as we have detected a theme        
+        # If no themes are detected in both cases, append SUCCESS to the student_report
+        student_report["speech"] = "SUCCESS: No themes detected."
+        
+    except Exception as e:
+        # Handle any exceptions that occur during the process
+        student_report["speech"] = f"ERROR: An error occurred while processing speech report: {str(e)}"

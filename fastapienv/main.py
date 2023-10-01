@@ -14,6 +14,7 @@ import base64
 # import project utilities
 import logging 
 import db
+import os
 import ml_utils as ML 
 from project_utils import Logger, ErrorHandler  # <-- Importing Logger and ErrorHandler
 
@@ -26,10 +27,12 @@ logger = Logger(name="main_module")
 @app.on_event("startup")
 async def load_models():
     logger.log("Initializing machine learning models...", logging.INFO)
+    hf_token = os.getenv("HF_TOKEN")
     try:
         ML.Models.nlp = pipeline("document-question-answering", model="impira/layoutlm-document-qa",)
         ML.Models.image_processor = AutoImageProcessor.from_pretrained("hustvl/yolos-tiny")
         ML.Models.object_detection_model = AutoModelForObjectDetection.from_pretrained("hustvl/yolos-tiny")
+        ML.Models.speech_classifier = pipeline("zero-shot-classification", model="joeddav/xlm-roberta-large-xnli",token=hf_token)  # Initializing the new model at startup
         logger.log("Machine learning models initialized successfully.", logging.INFO)
     except Exception as e:
         ErrorHandler.handle_exception(e)
@@ -77,6 +80,7 @@ def get_student_report(student_email: str,student_test : str):
         ML.get_OOF_report(student_email,student_test,student_report) 
         ML.get_blur_report(student_email,student_test,student_report) 
         ML.get_OD_report(student_email,student_test,student_report)
+        ML.get_speech_report(student_email,student_test,student_report)
         # ... other report functions will go here ...
     except ErrorHandler.Error as e:
         ErrorHandler.handle_exception(e)
