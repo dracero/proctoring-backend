@@ -54,6 +54,40 @@ async def get_reports_for_test(test_name: str):
     logger.log(f"Reports generated successfully for test: {test_name}", logging.INFO)
     return student_reports
 
+@app.get("/reports/{test_name}/{student_email}/screenshot")
+async def get_screenshot_details(test_name: str, student_email: str):
+    try:
+        pass  # Placeholder for actual implementation
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/reports/{test_name}/{student_email}/out_of_frame")
+async def get_out_of_frame_details(test_name: str, student_email: str):
+    try:
+        pass  # Placeholder for actual implementation
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/reports/{test_name}/{student_email}/blur")
+async def get_blur_details(test_name: str, student_email: str):
+    try:
+        pass  # Placeholder for actual implementation
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/reports/{test_name}/{student_email}/object_detection")
+async def get_object_detection_details(test_name: str, student_email: str):
+    try:
+        pass  # Placeholder for actual implementation
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/reports/{test_name}/{student_email}/speech_detection")
+async def get_speech_detection_details(test_name: str, student_email: str):
+    try:
+        pass  # Placeholder for actual implementation
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 def retrieve_students(exam_name: str):
     try:
