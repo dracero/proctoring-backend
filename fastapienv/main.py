@@ -189,18 +189,3 @@ def get_student_report(student_email: str,student_test : str):
     logger.log(f"Report generated successfully for student: {student_email}", logging.INFO)
     return student_report
 
-# Consultas:
-    ################################
-    #   El checkeo de ML_screenshot se encuentra harcodeado,
-    #   ¿Cómo manejamos los distintos checkeos para cada exámen?
-    #   IDEA 1: Crear una 'screenshot_checklist' según el nombre de el exámen
-    #   IDEA 2: Si solo verificamos el título de el exámen, entonces podemos simplemente
-    #   pasarlo como argumento y comparar con él (ESTA)
-    ################################
-    #   ¿Cómo manejamos los distintos tipos de fallos?
-    #   IDEA 1: Puedo dejarlo como esta y que el front se ocupe de el manejo.
-    ################################
-    #   ¿Qué módulo de ML implemento para la semana que viene?
-    #   EXPLICACIÓN: 
-    #   Pasar los Screenshots Periodicos por el detector de objetos
-
