@@ -27,6 +27,12 @@ logger = Logger(name="main_module")
 
 # Initialize all machine learning models at startup
 @app.on_event("startup")
+async def startup():
+    # Existing code to load models
+    await load_models()    
+    # Call refresh_reports to ensure all reports are generated and stored
+    await refresh_reports()
+
 async def load_models():
     logger.log("Initializing machine learning models...", logging.INFO)
     hf_token = os.getenv("HF_TOKEN")
@@ -40,21 +46,64 @@ async def load_models():
         ErrorHandler.handle_exception(e)
         logger.log(f"Error initializing models: {str(e)}", logging.ERROR)
 
+async def refresh_reports():
+    try:
+        logger.log("Initializing report refresh", logging.INFO)
+        # Step 1: Query all exam names from the "test" collection
+        all_tests_data = db.get_mongo_collection("test")
+        all_exam_names = set([data["exam"] for data in all_tests_data])
+        # Step 2: Check existing reports in the "reports" collection
+        all_reports_data = db.get_mongo_collection("reports")
+        reported_exam_names = set([data["test"] for data in all_reports_data])
+        # Step 3: Identify exams that are missing reports
+        missing_reports = all_exam_names - reported_exam_names
+        # Step 4: Generate reports for missing exams
+        for exam_name in missing_reports:
+            await produce_report(exam_name)
+            logger.log(f"Report generated and stored for exam: {exam_name}", logging.INFO)
+
+    except Exception as e:
+        ErrorHandler.handle_exception(e)
+        logger.log(f"Error refreshing reports: {str(e)}", logging.ERROR)
+
 @app.get("/reports/{test_name}")
 async def get_reports_for_test(test_name: str):
-    logger.log(f"Generating reports for test: {test_name}", logging.INFO)    
-    # Retrieve the list of students who took the specified test
-    students_list = retrieve_students(test_name)    
-    logger.log(f"List of students who took the specified test: {students_list}", logging.INFO)
-    # Initialize an empty list to hold the reports for each student
-    student_reports = []    
-    for student_email in students_list:
-        # Generate the report for the student
-        report = get_student_report(student_email,test_name)
-        # Append the report to the list of reports
-        student_reports.append(report)    
-    logger.log(f"Reports generated successfully for test: {test_name}", logging.INFO)
-    return student_reports
+    try:
+        # Step 1: Query the entry of the "reports" collection that corresponds to this test name
+        query = {"test": test_name}
+        report_data = db.get_mongo_collection("reports", query)
+
+        # Step 2: Check if the report data exists for the given test name
+        if not report_data:
+            raise HTTPException(status_code=404, detail=f"No reports found for test: {test_name}")
+
+        # Step 3: Return the 'reports' field of this entry
+        return report_data[0]["reports"]
+
+    except Exception as e:
+        ErrorHandler.handle_exception(e)
+        logger.log(f"Error fetching reports for test {test_name}: {str(e)}", logging.ERROR)
+        raise HTTPException(status_code=500, detail=f"Error fetching reports for test: {test_name}")
+
+@app.get("/reports/refresh/full")
+async def full_refresh_reports():
+    try:
+        # Step 1: Delete all elements from the reports collection
+        db.clear_mongo_collection("reports")
+        logger.log("Cleared all reports from the database.", logging.INFO)
+        # Step 2: Query all exam names from the test collection
+        test_data = db.get_mongo_collection("test")
+        exam_names = set([data["exam"] for data in test_data])
+        # Step 3: Call produce_report for each exam name
+        for exam_name in exam_names:
+            await produce_report(exam_name)
+            logger.log(f"Refreshed report for test: {exam_name}", logging.INFO)
+        return {"status": "success", "message": "Reports fully refreshed."}
+
+    except Exception as e:
+        ErrorHandler.handle_exception(e)
+        logger.log(f"Error during full refresh: {str(e)}", logging.ERROR)
+        raise HTTPException(status_code=500, detail="Error during full refresh of reports.")
 
 @app.get("/reports/{test_name}/{student_email}/screenshot")
 async def get_screenshot_details(test_name: str, student_email: str):
@@ -168,12 +217,34 @@ def retrieve_students(exam_name: str):
         return []
 
 
+async def produce_report(test_name: str):
+    logger.log(f"Generating reports for test: {test_name}", logging.INFO)    
+    # Retrieve the list of students who took the specified test
+    students_list = retrieve_students(test_name)    
+    logger.log(f"List of students who took the specified test: {students_list}", logging.INFO)
+    # Initialize an empty list to hold the reports for each student
+    student_reports = []    
+    for student_email in students_list:
+        # Generate the report for the student
+        report = get_student_report(student_email,test_name)
+        # Append the report to the list of reports
+        student_reports.append(report)    
+        # Create the final report structure
+    final_report = {
+        "test": test_name,
+        "reports": student_reports
+    }
+    # Store the final report in the database
+    db.insert_into_mongo_collection("reports",final_report)
+    logger.log(f"Reports generated successfully for test: {test_name}", logging.INFO)
+
+
+
 def get_student_report(student_email: str,student_test : str):
     logger.log(f"Generating report for student: {student_email}", logging.INFO)
     # Initialize an empty dictionary that will hold the report for the student
     student_report = dict()
     student_report["student"] = student_email
-    student_report["test"] = student_test 
     try:
         # Process student screenshot and append results to the report
         ML.get_screenshot_report(student_email,student_test,student_report)
