@@ -75,7 +75,9 @@ def get_OD_report(student_email: str, student_test: str, student_report: dict):
         if not periodic_photos_data:
             student_report["objectDetection"] = "FAIL: No periodic photos found."
             return
-        
+
+        object_detected = False  # Flag to track if any object is detected
+
         for photo_data in periodic_photos_data:
             # Convert base64 to Image
             base64_image = photo_data["image"]
@@ -88,11 +90,11 @@ def get_OD_report(student_email: str, student_test: str, student_report: dict):
             # Convert outputs to COCO API
             target_sizes = torch.tensor([image.size[::-1]])
             results = Models.image_processor.post_process_object_detection(outputs, threshold=0.5, target_sizes=target_sizes)[0]
-            # Determine whether the function should return "SUCCESS" or "FAIL"
+
             person_detected = False
             cell_phone_detected = False
             cell_phone_confidence = 0
-            
+
             for score, label in zip(results["scores"], results["labels"]):
                 detected_object = Models.object_detection_model.config.id2label[label.item()]
                 if detected_object == "person":
@@ -100,16 +102,25 @@ def get_OD_report(student_email: str, student_test: str, student_report: dict):
                 elif detected_object == "cell phone":
                     cell_phone_detected = True
                     cell_phone_confidence = score.item()
-            
+
+            # If an object is detected, store the photo data in ObjectDetectionData collection
             if not person_detected or (cell_phone_detected and cell_phone_confidence > 0.9):
-                student_report["objectDetection"] = "FAIL"
-                return
-        
-        student_report["objectDetection"] = "SUCCESS"
+                object_detected = True
+                detected_data = {
+                    "student": photo_data["student"],
+                    "exam": photo_data["exam"],
+                    "time": photo_data["time"],
+                    "image": photo_data["image"]
+                }
+                db.insert_into_mongo_collection("ObjectDetectionData", detected_data)
+
+        # Set the report status based on whether any object was detected
+        student_report["objectDetection"] = "FAIL" if object_detected else "SUCCESS"
                 
     except ErrorHandler.Error as e:
         ErrorHandler.handle_exception(e)
         logger.log(str(e), logging.ERROR)
+
 
 def get_speech_report(student_email: str, student_test: str, student_report: dict):
     logger.log(f"Running speech recognition for student: {student_email} for test: {student_test}")

@@ -104,6 +104,20 @@ async def full_refresh_reports():
         ErrorHandler.handle_exception(e)
         logger.log(f"Error during full refresh: {str(e)}", logging.ERROR)
         raise HTTPException(status_code=500, detail="Error during full refresh of reports.")
+    
+@app.get("/exams")
+async def get_exam_names():
+    try:
+        # Step 1: Query all exam names from the test collection
+        test_data = db.get_mongo_collection("test")
+        exam_names = set([data["exam"] for data in test_data])
+        # Step 3: Call produce_report for each exam name
+        return exam_names
+
+    except Exception as e:
+        ErrorHandler.handle_exception(e)
+        logger.log(f"Error loading exam names: {str(e)}", logging.ERROR)
+        raise HTTPException(status_code=500, detail="Error during exam names load.")
 
 @app.get("/reports/{test_name}/{student_email}/screenshot")
 async def get_screenshot_details(test_name: str, student_email: str):
@@ -182,7 +196,7 @@ async def get_object_detection_details(test_name: str, student_email: str):
         }
         logger.log(f"Connecting to periodicPhotos database for student: {student_email}", logging.INFO)
         # Retrieving the corresponding entries from the blur collection in the database
-        photo_entries = db.get_mongo_collection("periodicPhotos", query)
+        photo_entries = db.get_mongo_collection("ObjectDetectionData", query)
         # Extracting the time and message from each entry and returning them
         return [{"time": entry["time"], "image": entry["image"]} for entry in photo_entries]
     except Exception as e:

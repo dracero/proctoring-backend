@@ -13,7 +13,7 @@ mongodb_uri = os.getenv("MONGODB_URI")
 client = MongoClient(mongodb_uri)
 db = client["proctoring"]
 
-VALID_COLLECTIONS = ["blur", "conversations", "firstPhoto", "screenshot","test","periodicPhotos","outOfFrame","reports"]
+VALID_COLLECTIONS = ["blur", "conversations", "firstPhoto", "screenshot","test","periodicPhotos","outOfFrame","reports","ObjectDetectionData"]
 
 def get_mongo_collection(collection_name: str, query: dict = None):
     # Ensure the collection name is valid
@@ -23,7 +23,7 @@ def get_mongo_collection(collection_name: str, query: dict = None):
     collection = db[collection_name]
     # If a query dictionary was passed, use it to filter the documents
     documents = list(collection.find(query or {}))
-    
+
     return json.loads(json_util.dumps(documents))
 
 def insert_into_mongo_collection(collection_name: str, data: dict):
@@ -32,6 +32,7 @@ def insert_into_mongo_collection(collection_name: str, data: dict):
         raise ErrorHandler.InvalidCollectionError(f"Invalid collection name: {collection_name}")
     try:
         existing_data = get_mongo_collection(collection_name, data)
+
         if existing_data:
             return  # If the data already exists, simply return without inserting
         collection = db[collection_name]
