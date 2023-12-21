@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pymongo import MongoClient
 import os
 # import database utilities
@@ -25,13 +25,17 @@ app = FastAPI()
 # Initialize the logger
 logger = Logger(name="main_module")
 
-# Initialize all machine learning models at startup
+# Startup Events
+ # Load all Machine Learning Models
+ # Refresh Reports (In case new data has beene added to the database)
 @app.on_event("startup")
 async def startup():
-    # Existing code to load models
-    await load_models()    
-    # Call refresh_reports to ensure all reports are generated and stored
-    await refresh_reports()
+    # Start events on the Background
+    init_background_tasks(BackgroundTasks())
+
+def init_background_tasks(background_tasks: BackgroundTasks):
+    background_tasks.add_task(load_models)
+    background_tasks.add_task(refresh_reports)
 
 async def load_models():
     logger.log("Initializing machine learning models...", logging.INFO)
@@ -52,12 +56,12 @@ async def refresh_reports():
         # Step 1: Query all exam names from the "test" collection
         all_tests_data = db.get_mongo_collection("test")
         all_exam_names = set([data["exam"] for data in all_tests_data])
-        # Step 2: Check existing reports in the "reports" collection
+        # Step 2: Query existing reports from the database
         all_reports_data = db.get_mongo_collection("reports")
         reported_exam_names = set([data["test"] for data in all_reports_data])
-        # Step 3: Identify exams that are missing reports
+        # Step 3: Check if new exams have been aded
         missing_reports = all_exam_names - reported_exam_names
-        # Step 4: Generate reports for missing exams
+        # Step 4: Generate reports for those exams
         for exam_name in missing_reports:
             await produce_report(exam_name)
             logger.log(f"Report generated and stored for exam: {exam_name}", logging.INFO)
@@ -66,6 +70,8 @@ async def refresh_reports():
         ErrorHandler.handle_exception(e)
         logger.log(f"Error refreshing reports: {str(e)}", logging.ERROR)
 
+
+# Get The specific report for a specific test
 @app.get("/reports/{test_name}")
 async def get_reports_for_test(test_name: str):
     try:
@@ -85,6 +91,29 @@ async def get_reports_for_test(test_name: str):
         logger.log(f"Error fetching reports for test {test_name}: {str(e)}", logging.ERROR)
         raise HTTPException(status_code=500, detail=f"Error fetching reports for test: {test_name}")
 
+# Partial Refresh will be called from the Front-End on it's startup
+@app.get("/reports/refresh/partial")
+async def partial_refresh_reports():
+    try:
+        logger.log("Initializing report refresh", logging.INFO)
+        # Step 1: Query all exam names from the "test" collection
+        all_tests_data = db.get_mongo_collection("test")
+        all_exam_names = set([data["exam"] for data in all_tests_data])
+        # Step 2: Query existing reports from the database
+        all_reports_data = db.get_mongo_collection("reports")
+        reported_exam_names = set([data["test"] for data in all_reports_data])
+        # Step 3: Check if new exams have been aded
+        missing_reports = all_exam_names - reported_exam_names
+        # Step 4: Generate reports for those exams
+        for exam_name in missing_reports:
+            await produce_report(exam_name)
+            logger.log(f"Report generated and stored for exam: {exam_name}", logging.INFO)
+
+    except Exception as e:
+        ErrorHandler.handle_exception(e)
+        logger.log(f"Error refreshing reports: {str(e)}", logging.ERROR)
+
+# Full Refresh to be used if ever needed
 @app.get("/reports/refresh/full")
 async def full_refresh_reports():
     try:
@@ -104,7 +133,8 @@ async def full_refresh_reports():
         ErrorHandler.handle_exception(e)
         logger.log(f"Error during full refresh: {str(e)}", logging.ERROR)
         raise HTTPException(status_code=500, detail="Error during full refresh of reports.")
-    
+
+# Get exams. To be used by the Front-End to list the available examinations    
 @app.get("/exams")
 async def get_exam_names():
     try:
@@ -119,6 +149,8 @@ async def get_exam_names():
         logger.log(f"Error loading exam names: {str(e)}", logging.ERROR)
         raise HTTPException(status_code=500, detail="Error during exam names load.")
 
+
+# Get a specific screenshot report
 @app.get("/reports/{test_name}/{student_email}/screenshot")
 async def get_screenshot_details(test_name: str, student_email: str):
     try:
@@ -134,6 +166,7 @@ async def get_screenshot_details(test_name: str, student_email: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# Get a specific out of frame report
 @app.get("/reports/{test_name}/{student_email}/out_of_frame")
 async def get_out_of_frame_details(test_name: str, student_email: str):
     try:
@@ -168,6 +201,7 @@ async def get_out_of_frame_details(test_name: str, student_email: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# Get a specific blur report
 @app.get("/reports/{test_name}/{student_email}/blur")
 async def get_blur_details(test_name: str, student_email: str):
     try:
@@ -186,6 +220,7 @@ async def get_blur_details(test_name: str, student_email: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# Get a specific object detection report
 @app.get("/reports/{test_name}/{student_email}/object_detection")
 async def get_object_detection_details(test_name: str, student_email: str):
     try:
@@ -202,6 +237,7 @@ async def get_object_detection_details(test_name: str, student_email: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# Get a specific speech detection report
 @app.get("/reports/{test_name}/{student_email}/speech_detection")
 async def get_speech_detection_details(test_name: str, student_email: str):
     try:
@@ -218,6 +254,7 @@ async def get_speech_detection_details(test_name: str, student_email: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
 def retrieve_students(exam_name: str):
     try:
         logger.log(f"Fetching the list of students for the test: {exam_name}", logging.INFO)
@@ -230,28 +267,28 @@ def retrieve_students(exam_name: str):
         logger.log(str(e), logging.ERROR)
         return []
 
-
+# Produce full report for a given exam
 async def produce_report(test_name: str):
     logger.log(f"Generating reports for test: {test_name}", logging.INFO)    
-    # Retrieve the list of students who took the specified test
+    # Step 1: Retrieve the list of students who took the test
     students_list = retrieve_students(test_name)    
     logger.log(f"List of students who took the specified test: {students_list}", logging.INFO)
-    # Initialize an empty list to hold the reports for each student
-    student_reports = []    
+    # Step 2: Initialize an empty list to hold the reports for each student
+    student_reports = [] 
+    # Step 3: Generate report for each student for thist est   
     for student_email in students_list:
         # Generate the report for the student
         report = get_student_report(student_email,test_name)
         # Append the report to the list of reports
         student_reports.append(report)    
-        # Create the final report structure
+    # Step 4: Create the final report structure
     final_report = {
         "test": test_name,
         "reports": student_reports
     }
-    # Store the final report in the database
+    # Step 5: Store the final report in the database
     db.insert_into_mongo_collection("reports",final_report)
     logger.log(f"Reports generated successfully for test: {test_name}", logging.INFO)
-
 
 
 def get_student_report(student_email: str,student_test : str):

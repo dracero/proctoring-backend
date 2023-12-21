@@ -4,3 +4,4 @@
 /fastapienv/Scripts
 /fastapienv/share
 /fastapienv/pyvenv
+.env

@@ -97,6 +97,7 @@ def get_OD_report(student_email: str, student_test: str, student_report: dict):
 
             for score, label in zip(results["scores"], results["labels"]):
                 detected_object = Models.object_detection_model.config.id2label[label.item()]
+                print('detected_object:', detected_object)
                 if detected_object == "person":
                     person_detected = True
                 elif detected_object == "cell phone":
@@ -104,7 +105,7 @@ def get_OD_report(student_email: str, student_test: str, student_report: dict):
                     cell_phone_confidence = score.item()
 
             # If an object is detected, store the photo data in ObjectDetectionData collection
-            if not person_detected or (cell_phone_detected and cell_phone_confidence > 0.9):
+            if cell_phone_detected and cell_phone_confidence > 0.9:
                 object_detected = True
                 detected_data = {
                     "student": photo_data["student"],
