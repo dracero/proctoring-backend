@@ -16,7 +16,7 @@ class Models:
     object_detection_model = None
     speech_classifier = None
 
-def get_screenshot_report(student_email: str, student_test: str,student_report: dict):
+def get_screenshot_report(student_email: str, student_test: str, student_report: dict):
     logger.log(f"Generating screenshot report for student: {student_email} for the test: {student_test}")
     screenshots = db.get_mongo_collection("screenshot", {"student": student_email, "exam": student_test})
     if not screenshots:
@@ -29,15 +29,22 @@ def get_screenshot_report(student_email: str, student_test: str,student_report: 
     image_data = base64.b64decode(base64_image.split(',')[1])
     image = Image.open(BytesIO(image_data))
     image = image.convert('RGB')
-    # Use the document-question-answering pipeline
-    title_data = Models.nlp(image, "What does the title say?")[0]
-    score = title_data.get('score', 0)
-    answer = title_data.get('answer', '').lower()
-    if score < 0.5:
-        result = False
-    else:
-        result = answer == student_test.lower()
-    student_report["screenshot"] = "SUCCESS" if result else "FAIL: Wrong text."
+    try:
+        # Use the document-question-answering pipeline
+        title_data = Models.nlp(image, "What does the title say?")[0]
+        score = title_data.get('score', 0)
+        answer = title_data.get('answer', '').lower()
+        if score < 0.5:
+            result = False
+        else:
+            result = answer == student_test.lower()
+        student_report["screenshot"] = "SUCCESS" if result else "FAIL: Wrong text."
+    except Exception as e:
+        # If there's an error in reading the text, log the exception and set the report to indicate failure due to no text.
+        logger.log(f"Error processing screenshot for student: {student_email} for the test: {student_test}. Error: {e}")
+        student_report["screenshot"] = "FAIL: No text."
+
+
 
 def get_OOF_report(student_email: str, student_test: str, student_report: dict):
     logger.log(f"Generating out of frame report for student: {student_email} for the test: {student_test}")

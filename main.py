@@ -30,12 +30,8 @@ logger = Logger(name="main_module")
  # Refresh Reports (In case new data has beene added to the database)
 @app.on_event("startup")
 async def startup():
-    # Start events on the Background
-    init_background_tasks(BackgroundTasks())
-
-def init_background_tasks(background_tasks: BackgroundTasks):
-    background_tasks.add_task(load_models)
-    background_tasks.add_task(refresh_reports)
+    await load_models()
+    await refresh_reports()
 
 async def load_models():
     logger.log("Initializing machine learning models...", logging.INFO)
@@ -259,7 +255,7 @@ def retrieve_students(exam_name: str):
     try:
         logger.log(f"Fetching the list of students for the test: {exam_name}", logging.INFO)
         students_data = db.get_mongo_collection("test")
-        students_list = [data["student"] for data in students_data if data["exam"].lower() == exam_name.lower()]
+        students_list = list(set([data["student"] for data in students_data if data["exam"].lower() == exam_name.lower()]))
         logger.log(f"Students list: {students_list}", logging.INFO)
         return students_list
     except Exception as e:
