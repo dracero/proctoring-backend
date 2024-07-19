@@ -25,6 +25,12 @@ app = FastAPI()
 # Initialize the logger
 logger = Logger(name="main_module")
 
+"""
+
+# ML PROCESSING HAS BEEN OUTSOURCED TO A LOCAL MACHINE WITH A NVIDIA GPU
+# IT WILL EXECUTE PERIODICALLY THERE
+# UNCOMMENT DOCSTRINGS TO EXECUTE WHENEVER THE BACK-END IS LAUNCHED
+
 # Startup Events
  # Load all Machine Learning Models
  # Refresh Reports (In case new data has beene added to the database)
@@ -64,8 +70,8 @@ async def refresh_reports():
 
     except Exception as e:
         ErrorHandler.handle_exception(e)
-        logger.log(f"Error refreshing reports: {str(e)}", logging.ERROR)
-
+        logger.log(f"Error refreshing reports:
+"""
 
 # Get The specific report for a specific test
 @app.get("/reports/{test_name}")
@@ -251,6 +257,7 @@ async def get_speech_detection_details(test_name: str, student_email: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+"""
 def retrieve_students(exam_name: str):
     try:
         logger.log(f"Fetching the list of students for the test: {exam_name}", logging.INFO)
@@ -306,4 +313,4 @@ def get_student_report(student_email: str,student_test : str):
     
     logger.log(f"Report generated successfully for student: {student_email}", logging.INFO)
     return student_report
-
+"""

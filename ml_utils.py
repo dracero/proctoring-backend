@@ -9,6 +9,7 @@ from project_utils import Logger, ErrorHandler  # Import the Logger and ErrorHan
 # Initialize the logger for this module
 logger = Logger(__name__)
 
+"""
 # Wrapper for ML models. The attributes are initialized at startup. 
 class Models:
     nlp = None
@@ -169,3 +170,4 @@ def get_speech_report(student_email: str, student_test: str, student_report: dic
     except Exception as e:
         # Handle any exceptions that occur during the process
         student_report["speech"] = f"ERROR: An error occurred while processing speech report: {str(e)}"
+"""
